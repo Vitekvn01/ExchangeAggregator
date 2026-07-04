@@ -1,0 +1,11 @@
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\bin\Debug\net10.0\ExchangeAggregator.Core.deps.json
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\bin\Debug\net10.0\ExchangeAggregator.Core.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\bin\Debug\net10.0\ExchangeAggregator.Core.pdb
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ExchangeAggregator.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ExchangeAggregator.Core.AssemblyInfoInputs.cache
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ExchangeAggregator.Core.AssemblyInfo.cs
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ExchangeAggregator.Core.csproj.CoreCompileInputs.cache
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ExchangeAggregator.Core.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\refint\ExchangeAggregator.Core.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ExchangeAggregator.Core.pdb
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ref\ExchangeAggregator.Core.dll

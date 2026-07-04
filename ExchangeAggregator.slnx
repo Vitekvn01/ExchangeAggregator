@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="ExchangeAggregator.Api/ExchangeAggregator.Api.csproj" />
+  <Project Path="ExchangeAggregator.Core/ExchangeAggregator.Core.csproj" />
+  <Project Path="ExchangeAggregator.Infrastructure/ExchangeAggregator.Infrastructure.csproj" />
+  <Project Path="ExchangeAggregator.Simulators/ExchangeAggregator.Simulators.csproj" />
+  <Project Path="ExchangeAggregator.Tests/ExchangeAggregator.Tests.csproj" />
+</Solution>

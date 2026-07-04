@@ -1,0 +1,15 @@
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\bin\Debug\net10.0\ExchangeAggregator.Infrastructure.deps.json
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\bin\Debug\net10.0\ExchangeAggregator.Infrastructure.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\bin\Debug\net10.0\ExchangeAggregator.Infrastructure.pdb
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\bin\Debug\net10.0\ExchangeAggregator.Core.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\bin\Debug\net10.0\ExchangeAggregator.Core.pdb
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.csproj.AssemblyReference.cache
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.AssemblyInfoInputs.cache
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.AssemblyInfo.cs
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.csproj.CoreCompileInputs.cache
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\Exchange.AE553F64.Up2Date
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\refint\ExchangeAggregator.Infrastructure.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.pdb
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ref\ExchangeAggregator.Infrastructure.dll

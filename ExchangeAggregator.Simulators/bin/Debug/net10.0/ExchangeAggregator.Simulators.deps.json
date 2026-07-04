@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "ExchangeAggregator.Simulators/1.0.0": {
+        "dependencies": {
+          "ExchangeAggregator.Core": "1.0.0"
+        },
+        "runtime": {
+          "ExchangeAggregator.Simulators.dll": {}
+        }
+      },
+      "ExchangeAggregator.Core/1.0.0": {
+        "runtime": {
+          "ExchangeAggregator.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ExchangeAggregator.Simulators/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ExchangeAggregator.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
