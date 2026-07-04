@@ -13,7 +13,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.Configure<AggregatorOptions>(builder.Configuration.GetSection("Aggregator"));
 
-builder.Services.AddDbContext<TickDbContext>(options =>
+builder.Services.AddDbContextFactory<TickDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
 
 builder.Services.AddSingleton<TickMetrics>();
@@ -26,7 +26,7 @@ builder.Services.AddSingleton<ITickNormalizer, TickNormalizer>();
 
 builder.Services.AddSingleton<IDeduplicator>(_ => new Deduplicator(TimeSpan.FromMinutes(5)));
 
-builder.Services.AddScoped<ITickStore, TickStore>();
+builder.Services.AddSingleton<ITickStore, TickStore>();
 
 builder.Services.AddSingleton<TickProcessingPipeline>();
 

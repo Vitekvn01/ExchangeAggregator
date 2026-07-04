@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ExchangeAggregator.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b148fda60a5b0eaf97b0d4f9293baf7ea9ec4737")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c327c81a05a2858f90f179bbcd566674531e8bcf")]
 [assembly: System.Reflection.AssemblyProductAttribute("ExchangeAggregator.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ExchangeAggregator.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

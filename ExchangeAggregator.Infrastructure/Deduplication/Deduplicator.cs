@@ -34,7 +34,7 @@ public sealed class Deduplicator : IDeduplicator, IDisposable
     /// </summary>
     public bool IsDuplicate(NormalizedTick tick)
     {
-        var key = new DedupKey(tick.Ticker, tick.Exchange, tick.Timestamp);
+        var key = new DedupKey(tick.Ticker, tick.Exchange, tick.Timestamp, tick.Price);
         var nowTicks = DateTimeOffset.UtcNow.Ticks;
 
         // TryAdd возвращает true если ключа не было (мы его только что добавили)
