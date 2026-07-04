@@ -13,3 +13,4 @@ C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infr
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\refint\ExchangeAggregator.Infrastructure.dll
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.pdb
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ref\ExchangeAggregator.Infrastructure.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Infrastructure\obj\Debug\net10.0\ExchangeAggregator.Infrastructure.sourcelink.json

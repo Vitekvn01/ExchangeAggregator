@@ -16,3 +16,4 @@ C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Simu
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Simulators\obj\Debug\net10.0\ExchangeAggregator.Simulators.pdb
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Simulators\obj\Debug\net10.0\ExchangeAggregator.Simulators.genruntimeconfig.cache
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Simulators\obj\Debug\net10.0\ref\ExchangeAggregator.Simulators.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Simulators\obj\Debug\net10.0\ExchangeAggregator.Simulators.sourcelink.json

@@ -9,3 +9,4 @@ C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\refint\ExchangeAggregator.Core.dll
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ExchangeAggregator.Core.pdb
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ref\ExchangeAggregator.Core.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Core\obj\Debug\net10.0\ExchangeAggregator.Core.sourcelink.json

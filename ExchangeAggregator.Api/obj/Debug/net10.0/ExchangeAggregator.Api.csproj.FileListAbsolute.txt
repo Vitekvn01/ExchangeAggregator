@@ -57,3 +57,4 @@ C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Api\
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Api\obj\Debug\net10.0\ExchangeAggregator.Api.pdb
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Api\obj\Debug\net10.0\ExchangeAggregator.Api.genruntimeconfig.cache
 C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Api\obj\Debug\net10.0\ref\ExchangeAggregator.Api.dll
+C:\IDE\MicrosoftVisualStudio\Projects\ExchangeAggregator\ExchangeAggregator.Api\obj\Debug\net10.0\ExchangeAggregator.Api.sourcelink.json
