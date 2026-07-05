@@ -97,10 +97,108 @@ public class ReconnectionTests
         try { await clientTask; } catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// Интеграционный тест: при падении одной биржи остальные продолжают получать данные.
+    ///
+    /// Сценарий:
+    ///  1. Поднимаем сервер Binance и сервер Kraken на разных портах.
+    ///  2. Запускаем двух ExchangeWebSocketClient (каждый в свой канал).
+    ///  3. Оба получают тики (Reconnects >= 1 для каждого).
+    ///  4. Роняем сервер Binance.
+    ///  5. Kraken продолжает получать тики (без перерыва).
+    ///  6. Binance-клиент теряет соединение, начинает backoff.
+    ///  7. Поднимаем сервер Binance заново на том же порту.
+    ///  8. Binance-клиент переподключается и снова получает тики.
+    /// </summary>
+    [Fact]
+    public async Task OneExchangeCrash_DoesNotAffectOthers()
+    {
+        // ── arrange: два сервера, два канала, два клиента ──
+        var metrics = new TickMetrics();
+
+        var binanceChannel = Channel.CreateBounded<string>(new BoundedChannelOptions(10_000)
+        {
+            FullMode = BoundedChannelFullMode.DropWrite
+        });
+        var krakenChannel = Channel.CreateBounded<string>(new BoundedChannelOptions(10_000)
+        {
+            FullMode = BoundedChannelFullMode.DropWrite
+        });
+
+        var options = Options.Create(new AggregatorOptions
+        {
+            ReconnectDelayMinMs = 100,
+            ReconnectDelayMaxMs = 1_000,
+            IdleTimeoutSeconds = 3,
+            ChannelCapacity = 10_000
+        });
+
+        // Серверы
+        var (serverBinance, binancePort) = await StartBinanceServerAsync();
+        var (serverKraken, krakenPort) = await StartBinanceServerAsync(); // формат не важен, важна изоляция
+
+        var binanceUrl = $"ws://localhost:{binancePort}/binance/ws";
+        var krakenUrl = $"ws://localhost:{krakenPort}/binance/ws";
+
+        var binanceClient = new ExchangeWebSocketClient(
+            "Binance", binanceUrl, binanceChannel.Writer, metrics, options,
+            NullLogger<ExchangeWebSocketClient>.Instance);
+        var krakenClient = new ExchangeWebSocketClient(
+            "Kraken", krakenUrl, krakenChannel.Writer, metrics, options,
+            NullLogger<ExchangeWebSocketClient>.Instance);
+
+        using var cts = new CancellationTokenSource();
+        var binanceTask = binanceClient.RunAsync(cts.Token);
+        var krakenTask = krakenClient.RunAsync(cts.Token);
+
+        // ── act 1: оба получают тики ──
+        using var readCts1 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var binanceTicks1 = await DrainTicksAsync(binanceChannel.Reader, minCount: 3, readCts1.Token);
+        var krakenTicks1 = await DrainTicksAsync(krakenChannel.Reader, minCount: 3, readCts1.Token);
+
+        Assert.True(binanceTicks1 >= 3,
+            $"Шаг 1 — Binance недополучил: {binanceTicks1}");
+        Assert.True(krakenTicks1 >= 3,
+            $"Шаг 1 — Kraken недополучил: {krakenTicks1}");
+
+        // ── act 2: роняем Binance ──
+        await StopServerAsync(serverBinance);
+        await Task.Delay(TimeSpan.FromSeconds(5), CancellationToken.None);
+
+        // ── act 3: Kraken продолжает получать тики ──
+        using var readCts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var krakenTicks2 = await DrainTicksAsync(krakenChannel.Reader, minCount: 3, readCts2.Token);
+        Assert.True(krakenTicks2 >= 3,
+            $"Шаг 3 — Kraken должен продолжать получать тики после падения Binance, получили: {krakenTicks2}");
+
+        // ── act 4: переподнимаем Binance ──
+        var (serverBinance2, _) = await StartBinanceServerAsync(binancePort);
+        await Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        // ── act 5: Binance снова получает тики ──
+        using var readCts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var binanceTicks2 = await DrainTicksAsync(binanceChannel.Reader, minCount: 3, readCts3.Token);
+        Assert.True(binanceTicks2 >= 3,
+            $"Шаг 5 — Binance не восстановился после переподключения: {binanceTicks2}");
+
+        // ── акцент: Kraken ни разу не прерывался ──
+        // krakenClient не терял соединение → Reconnects у него (в этом клиенте) = 1.
+        // Но метрика общая, так что просто убеждаемся что данные шли непрерывно.
+
+        long totalReconnects = metrics.Reconnects;
+        Assert.True(totalReconnects >= 3, // Binance: 2 (initial+reconnect), Kraken: 1 (initial) = 3
+            $"Общий Reconnects должен быть >= 3 (Binance×2 + Kraken×1), фактически: {totalReconnects}");
+
+        // ── cleanup ──
+        await StopServerAsync(serverBinance2);
+        await StopServerAsync(serverKraken);
+        cts.Cancel();
+        try { await Task.WhenAll(binanceTask, krakenTask); } catch (OperationCanceledException) { }
+    }
+
     // ─────────────────────────────────────────────────────────────────
     //  Helpers
     // ─────────────────────────────────────────────────────────────────
-
     /// <summary>
     /// Поднимает Kestrel с endpoint /binance/ws на заданном (или случайном) порту.
     /// Использует WebApplication (современный API) + StartAsync.
@@ -145,7 +243,6 @@ public class ReconnectionTests
         {
             ["BTCUSD"] = 50000m, ["ETHUSD"] = 3000m, ["SOLUSD"] = 150m
         };
-
         try
         {
             while (socket.State == WebSocketState.Open)
