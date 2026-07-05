@@ -133,3 +133,86 @@ foreach parser in parsers:
 кладём в словарь:  TryAdd(key, nowTicks)
 не кладётся → уже был → дубликат
 кладётся      → новый тик, пропускаем дальше
+```
+### 4. Батчевая запись в БД с retry
+
+Pipeline накапливает NormalizedTick в батч (настраиваемый размер + интервал сброса).
+При флаше батча вызывает `ITickStore.WriteBatchAsync`, который преобразует модели
+в EF-entities и делает `AddRangeAsync` + `SaveChangesAsync`.
+
+**Retry-логика:** до 3 попыток с экспоненциальным backoff (100ms → 200ms → 400ms).
+Если все попытки провалились — батч дропается, тики считаются потерянными (`Dropped`).
+
+### 5. Graceful shutdown и drain канала
+
+При остановке приложения (`SIGTERM` / `Ctrl+C`):
+
+1. `Worker.StopAsync` вызывает `Pipeline.Stop()` — отменяет внутренний `CancellationTokenSource`.
+2. `ProcessLoopAsync` завершает цикл, сливая текущий батч в БД.
+3. `DrainAndFlushAsync` дочитывает оставшиеся тики из канала с таймаутом
+   (`DrainTimeoutSeconds`, по умолчанию 15 сек). Это гарантирует, что данные,
+   уже отправленные WebSocket-клиентами в канал, не будут потеряны.
+
+**Важно:** Drain не использует внешний `CancellationToken` — после `base.StopAsync`
+он уже cancelled. Drain опирается только на собственный таймаут.
+
+### 6. Переподключение WebSocket-клиентов
+
+Каждый клиент (`ExchangeWebSocketClient`) работает в бесконечном цикле:
+
+- При обрыве соединения — экспоненциальный backoff с jitter ±25%.
+- Idle-таймаут: если данных нет дольше `IdleTimeoutSeconds` (по умолчанию 30 сек) —
+  соединение считается зависшим, клиент переподключается.
+- Клиенты изолированы: падение одной биржи не влияет на остальные.
+
+### 7. Метрики и мониторинг
+
+Все метрики потокобезопасны (`Interlocked`) и выводятся раз в 10 секунд:
+
+| Метрика | Описание |
+|---|---|
+| `Received` | Получено сырых сообщений от WebSocket |
+| `Parsed` | Успешно разобрано парсерами |
+| `Duplicates` | Отфильтровано дедупликатором |
+| `Written` | Записано в БД |
+| `WriteErrors` | Ошибок при записи в БД (после ретраев) |
+| `Dropped` | Безвозвратно потеряно (overflow канала + провал записи после ретраев) |
+| `Reconnects` | Количество переподключений |
+| `ChannelBacklog` | Текущая глубина канала обработки |
+
+**Ответственность за метрику `Written`:** метрика увеличивается **только в pipeline**
+после успешного вызова `WriteBatchAsync`. `TickStore` не трогает `Written` — он
+отвечает только за запись в БД и увеличивает `WriteErrors`/`Dropped` при отказах.
+
+### 8. Конфигурация
+
+Все настройки в `appsettings.json`, секция `Aggregator`:
+
+```json
+{
+  "Aggregator": {
+    "Exchanges": [
+      { "Name": "Binance",  "Url": "ws://localhost:5001/binance/ws" },
+      { "Name": "Kraken",   "Url": "ws://localhost:5002/kraken/ws" },
+      { "Name": "Coinbase", "Url": "ws://localhost:5003/coinbase/ws" }
+    ],
+    "ReconnectDelayMinMs": 500,
+    "ReconnectDelayMaxMs": 30000,
+    "IdleTimeoutSeconds": 30,
+    "BatchSize": 100,
+    "BatchFlushIntervalMs": 500,
+    "ChannelCapacity": 10000,
+    "DrainTimeoutSeconds": 15
+  }
+}
+```
+
+| Параметр | По умолчанию | Описание |
+|---|---|---|
+| `ReconnectDelayMinMs` | 500 | Начальная задержка перед переподключением |
+| `ReconnectDelayMaxMs` | 30000 | Максимальная задержка (после экспоненциального роста) |
+| `IdleTimeoutSeconds` | 30 | Таймаут бездействия сокета |
+| `BatchSize` | 100 | Размер батча для записи в БД |
+| `BatchFlushIntervalMs` | 500 | Максимальный интервал между сбросом батча |
+| `ChannelCapacity` | 10000 | Ёмкость канала обработки (backpressure) |
+| `DrainTimeoutSeconds` | 15 | Таймаут слива канала при остановке |
