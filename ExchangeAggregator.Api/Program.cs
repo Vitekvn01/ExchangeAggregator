@@ -24,8 +24,8 @@ builder.Services.AddSingleton<ITickParser, CoinbaseTickParser>();
 
 builder.Services.AddSingleton<ITickNormalizer, TickNormalizer>();
 
-builder.Services.AddSingleton<IDeduplicator>(_ => new Deduplicator(TimeSpan.FromMinutes(5)));
-
+builder.Services.AddSingleton<IDeduplicator>(sp =>
+    new Deduplicator(TimeSpan.FromMinutes(5), sp.GetRequiredService<ILogger<Deduplicator>>()));
 builder.Services.AddSingleton<ITickStore, TickStore>();
 
 builder.Services.AddSingleton<TickProcessingPipeline>();

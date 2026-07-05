@@ -1,45 +1,37 @@
 ﻿using System.Collections.Concurrent;
 using ExchangeAggregator.Core.Interfaces;
 using ExchangeAggregator.Core.Models;
+using Microsoft.Extensions.Logging;
 
 namespace ExchangeAggregator.Infrastructure.Deduplication;
 
 /// <summary>
 /// Потокобезопасный дедупликатор на ConcurrentDictionary.
-/// Ключ: Ticker + Exchange + TimestampUnixSeconds (<see cref="DedupKey"/>).
+/// Ключ: Ticker + Exchange + TimestampUnixMs + Price (<see cref="DedupKey"/>).
 /// Окно: 5 минут — записи старше окна периодически вычищаются таймером.
 /// </summary>
 public sealed class Deduplicator : IDeduplicator, IDisposable
 {
-    // Ключ + момент добавления (ticks) для очистки по возрасту
     private readonly ConcurrentDictionary<DedupKey, long> _seen = new();
     private readonly TimeSpan _window;
     private readonly Timer _cleanupTimer;
+    private readonly ILogger<Deduplicator> _logger;
 
     public int Count => _seen.Count;
 
     /// <param name="window">Окно удержания ключей (рекомендуется 5 минут).</param>
-    public Deduplicator(TimeSpan window)
+    /// <param name="logger">Опциональный логер для диагностики очистки.</param>
+    public Deduplicator(TimeSpan window, ILogger<Deduplicator>? logger = null)
     {
         _window = window;
-        // Запускаем очистку раз в минуту — компромисс между памятью и CPU
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<Deduplicator>.Instance;
         _cleanupTimer = new Timer(Cleanup, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
     }
 
-    /// <summary>
-    /// Проверяет, дубликат ли этот тик.
-    /// Если ключа ещё нет — добавляет его и возвращает false (не дубликат).
-    /// Если ключ есть — возвращает true (дубликат).
-    /// Потокобезопасен: TryAdd атомарен в ConcurrentDictionary.
-    /// </summary>
     public bool IsDuplicate(NormalizedTick tick)
     {
         var key = new DedupKey(tick.Ticker, tick.Exchange, tick.Timestamp, tick.Price);
         var nowTicks = DateTimeOffset.UtcNow.Ticks;
-
-        // TryAdd возвращает true если ключа не было (мы его только что добавили)
-        // → это НЕ дубликат, возвращаем false.
-        // TryAdd возвращает false если ключ уже существует → дубликат.
         return !_seen.TryAdd(key, nowTicks);
     }
 
@@ -48,17 +40,25 @@ public sealed class Deduplicator : IDeduplicator, IDisposable
         try
         {
             var threshold = DateTimeOffset.UtcNow.Add(-_window).Ticks;
+            var removed = 0;
             foreach (var kvp in _seen)
             {
                 if (kvp.Value < threshold)
                 {
-                    _seen.TryRemove(kvp.Key, out _);
+                    if (_seen.TryRemove(kvp.Key, out _))
+                        removed++;
                 }
             }
+
+            if (removed > 0)
+            {
+                _logger.LogDebug("Deduplicator cleanup: удалено {Count} ключей старше окна {Window}",
+                    removed, _window);
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Таймер не должен ронять процесс — молча пропускаем
+            _logger.LogError(ex, "Ошибка при очистке дедупликатора");
         }
     }
 

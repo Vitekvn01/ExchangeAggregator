@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.WebSockets;
@@ -21,14 +22,43 @@ var app = builder.Build();
 app.UseWebSockets();
 var rng = new Random();
 
+// Активные WebSocket-соединения: exchange → socket
+var activeSockets = new ConcurrentDictionary<string, WebSocket>();
+
 string Fmt(decimal d) => d.ToString(CultureInfo.InvariantCulture);
 
+// ── HTTP: команда обрыва соединения ──
+app.Map("/crash/{exchange}", (string exchange) =>
+{
+    if (activeSockets.TryRemove(exchange, out var socket) &&
+        socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+    {
+        Console.WriteLine($"[CRASH] Ручной обрыв {exchange}");
+        try
+        {
+            socket.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "manual crash", CancellationToken.None);
+        }
+        catch { }
+        return Results.Ok($"{exchange} crashed");
+    }
+    return Results.NotFound($"No active connection for {exchange}");
+});
+
+app.Map("/crash", () =>
+{
+    var names = activeSockets.Keys.ToList();
+    return Results.Ok(names.Count > 0
+        ? $"Active exchanges: {string.Join(", ", names)}"
+        : "No active connections");
+});
+
+// ── WebSocket endpoints ──
 app.Map("/binance/ws", async (HttpContext ctx) =>
-    await HandleExchange(ctx, "Binance", (ticker, price, vol) =>
+    await HandleExchange(ctx, "Binance", activeSockets, (ticker, price, vol) =>
         $$"""{"s":"{{ticker}}","p":{{Fmt(price)}},"q":{{Fmt(vol)}},"t":{{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}""", rng));
 
 app.Map("/kraken/ws", async (HttpContext ctx) =>
-    await HandleExchange(ctx, "Kraken", (ticker, price, vol) =>
+    await HandleExchange(ctx, "Kraken", activeSockets, (ticker, price, vol) =>
     {
         var pair = $"{ticker[..3]}/{ticker[3..]}";
         var iso = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
@@ -36,7 +66,7 @@ app.Map("/kraken/ws", async (HttpContext ctx) =>
     }, rng));
 
 app.Map("/coinbase/ws", async (HttpContext ctx) =>
-    await HandleExchange(ctx, "Coinbase", (ticker, price, vol) =>
+    await HandleExchange(ctx, "Coinbase", activeSockets, (ticker, price, vol) =>
     {
         var sym = $"{ticker[..3]}-{ticker[3..]}";
         var sec = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
@@ -44,18 +74,23 @@ app.Map("/coinbase/ws", async (HttpContext ctx) =>
     }, rng));
 
 Console.WriteLine("=== Exchange Simulators ===");
-Console.WriteLine("Binance:  ws://localhost:5001/binance/ws");
-Console.WriteLine("Kraken:   ws://localhost:5002/kraken/ws");
-Console.WriteLine("Coinbase: ws://localhost:5003/coinbase/ws");
+Console.WriteLine("Binance:  ws://localhost:5001/binance/ws  | crash: GET http://localhost:5001/crash/binance");
+Console.WriteLine("Kraken:   ws://localhost:5002/kraken/ws   | crash: GET http://localhost:5002/crash/kraken");
+Console.WriteLine("Coinbase: ws://localhost:5003/coinbase/ws | crash: GET http://localhost:5003/crash/coinbase");
 Console.WriteLine("===========================");
 
 await app.RunAsync();
 
-static async Task HandleExchange(HttpContext ctx, string name, Func<string, decimal, decimal, string> formatTick, Random rng)
+static async Task HandleExchange(
+    HttpContext ctx, string name,
+    ConcurrentDictionary<string, WebSocket> sockets,
+    Func<string, decimal, decimal, string> formatTick, Random rng)
 {
     if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
     var socket = await ctx.WebSockets.AcceptWebSocketAsync();
+    sockets[name] = socket;
     Console.WriteLine($"[{name}] client connected");
+
     using var cts = new CancellationTokenSource();
     var tickers = new[] { "BTCUSD", "ETHUSD", "SOLUSD" };
     var basePrices = new Dictionary<string, decimal> { ["BTCUSD"] = 50000m, ["ETHUSD"] = 3000m, ["SOLUSD"] = 150m };
@@ -73,6 +108,7 @@ static async Task HandleExchange(HttpContext ctx, string name, Func<string, deci
     finally
     {
         cts.Cancel(); await genTask;
+        sockets.TryRemove(name, out _);
         if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
             try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None); } catch { }
         socket.Dispose();

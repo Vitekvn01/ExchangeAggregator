@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Net.WebSockets;
+﻿using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using ExchangeAggregator.Api.Configuration;
@@ -66,6 +65,8 @@ public sealed class ExchangeWebSocketClient : IDisposable
                     await Task.Delay(delay, ct);
                 }
 
+                // Освобождаем предыдущий CTS перед созданием нового — предотвращаем утечку
+                _internalCts?.Dispose();
                 _internalCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 await ConnectAndReadAsync(_internalCts.Token);
                 attempt = 0; // успешно — сбрасываем счётчик
@@ -95,15 +96,10 @@ public sealed class ExchangeWebSocketClient : IDisposable
         _logger.LogInformation("[{Exchange}] подключён к {Url}", _name, _url);
 
         var buffer = new byte[4096];
-        var lastData = Stopwatch.StartNew();
 
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        // Idle-таймаут: ждём данных не дольше idleTimeout
-        var idleToken = linkedCts.Token;
-
-        while (_socket.State == WebSocketState.Open && !idleToken.IsCancellationRequested)
+        while (_socket.State == WebSocketState.Open && !ct.IsCancellationRequested)
         {
-            // Ждём данные с таймаутом
+            // Idle-таймаут: каждое ReceiveAsync ждёт не дольше _idleTimeout
             using var timeoutCts = new CancellationTokenSource(_idleTimeout);
             using var receiveCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
@@ -122,14 +118,11 @@ public sealed class ExchangeWebSocketClient : IDisposable
                     var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
                     _metrics.IncrementReceived();
 
-                    // Пишем в канал; если канал переполнен — пропускаем (backpressure)
                     if (!_output.TryWrite(json))
                     {
                         _metrics.IncrementDropped();
                         _logger.LogWarning("[{Exchange}] канал переполнен, тик отброшен", _name);
                     }
-
-                    lastData.Restart();
                 }
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
@@ -160,7 +153,10 @@ public sealed class ExchangeWebSocketClient : IDisposable
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
                 await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", cts.Token);
             }
-            catch { }
+            catch
+            {
+                // Сокет может быть уже в невалидном состоянии — молча закрываем
+            }
         }
         _socket?.Dispose();
         _socket = null;

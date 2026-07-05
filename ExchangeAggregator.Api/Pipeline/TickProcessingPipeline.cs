@@ -8,19 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace ExchangeAggregator.Api.Pipeline;
 
-/// <summary>
-/// Сердце агрегатора — пайплайн обработки тиков.
-/// 
-/// Поток данных:
-///   ExchangeWebSocketClient → Channel<string> (сырые JSON)
-///   → парсинг (через ITickParser по имени биржи)
-///   → нормализация (ITickNormalizer)
-///   → дедупликация (IDeduplicator)
-///   → батчинг (накопление в List<NormalizedTick>)
-///   → ITickStore.WriteBatchAsync
-/// 
-/// Graceful shutdown: при CancellationToken — drain канала, дописываем батч.
-/// </summary>
 public sealed class TickProcessingPipeline : IDisposable
 {
     private readonly Channel<string> _channel;
@@ -59,16 +46,12 @@ public sealed class TickProcessingPipeline : IDisposable
 
         _channel = Channel.CreateBounded<string>(new BoundedChannelOptions(options.Value.ChannelCapacity)
         {
-            FullMode = BoundedChannelFullMode.DropWrite, // не блокируем отправителя — дропаем
+            FullMode = BoundedChannelFullMode.DropWrite,
             SingleWriter = false,
             SingleReader = true
         });
     }
 
-    /// <summary>
-    /// Запускает пайплайн. Работает до отмены токена.
-    /// При отмене — drain канала и дописывает последний батч.
-    /// </summary>
     public async Task RunAsync(CancellationToken externalCt)
     {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, externalCt);
@@ -80,8 +63,10 @@ public sealed class TickProcessingPipeline : IDisposable
         }
         catch (OperationCanceledException)
         {
-            // Graceful shutdown — drain
             _logger.LogInformation("Завершение пайплайна, drain канала...");
+        }
+        finally
+        {
             await DrainAndFlushAsync(externalCt);
         }
     }
@@ -91,47 +76,61 @@ public sealed class TickProcessingPipeline : IDisposable
         var batch = new List<NormalizedTick>(_batchSize);
         var lastFlush = DateTimeOffset.UtcNow;
 
-        while (await _channel.Reader.WaitToReadAsync(ct))
+        try
         {
-            while (_channel.Reader.TryRead(out var json))
+            while (await _channel.Reader.WaitToReadAsync(ct))
             {
-                ProcessSingle(json, batch);
+                while (_channel.Reader.TryRead(out var json))
+                {
+                    ProcessSingle(json, batch);
 
-                if (batch.Count >= _batchSize)
+                    if (batch.Count >= _batchSize)
+                    {
+                        await FlushBatchAsync(batch, ct);
+                        batch = new List<NormalizedTick>(_batchSize);
+                        lastFlush = DateTimeOffset.UtcNow;
+                    }
+                }
+
+                if (batch.Count > 0 && DateTimeOffset.UtcNow - lastFlush >= _flushInterval)
                 {
                     await FlushBatchAsync(batch, ct);
                     batch = new List<NormalizedTick>(_batchSize);
                     lastFlush = DateTimeOffset.UtcNow;
                 }
-            }
 
-            // Флаш по времени
-            if (batch.Count > 0 && DateTimeOffset.UtcNow - lastFlush >= _flushInterval)
+                _metrics.ChannelBacklog = _channel.Reader.Count;
+            }
+        }
+        finally
+        {
+            // Не теряем батч при отмене или закрытии канала
+            if (batch.Count > 0)
             {
-                await FlushBatchAsync(batch, ct);
-                batch = new List<NormalizedTick>(_batchSize);
-                lastFlush = DateTimeOffset.UtcNow;
+                try
+                {
+                    using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await _store.WriteBatchAsync(batch, flushCts.Token);
+                    _metrics.AddWritten(batch.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка при сливе батча ({Count} тиков) при остановке", batch.Count);
+                    _metrics.AddDropped(batch.Count);
+                }
             }
-
-            // Обновляем метрику backlog-а
-            _metrics.ChannelBacklog = _channel.Reader.Count;
         }
     }
 
     private void ProcessSingle(string json, List<NormalizedTick> batch)
     {
         RawTick? raw = null;
-        ITickParser? matchedParser = null;
 
-        // Пробуем все парсеры — первый, кто вернул не-null, выиграл
-        foreach (var (name, parser) in _parsers)
+        foreach (var (_, parser) in _parsers)
         {
             raw = parser.TryParse(json);
             if (raw is not null)
-            {
-                matchedParser = parser;
                 break;
-            }
         }
 
         if (raw is null)
@@ -156,10 +155,9 @@ public sealed class TickProcessingPipeline : IDisposable
     private async Task FlushBatchAsync(List<NormalizedTick> batch, CancellationToken ct)
     {
         if (batch.Count == 0) return;
-
         var toWrite = batch.ToArray();
-        var dropped = await _store.WriteBatchAsync(toWrite, ct);
-        // dropped уже учтён в TickStore через метрики
+        await _store.WriteBatchAsync(toWrite, ct);
+        _metrics.AddWritten(toWrite.Length);
     }
 
     private async Task DrainAndFlushAsync(CancellationToken ct)
@@ -172,7 +170,6 @@ public sealed class TickProcessingPipeline : IDisposable
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
             var drainCt = linked.Token;
 
-            // Читаем остатки из канала
             while (await _channel.Reader.WaitToReadAsync(drainCt))
             {
                 while (_channel.Reader.TryRead(out var json))
@@ -182,6 +179,7 @@ public sealed class TickProcessingPipeline : IDisposable
                     if (batch.Count >= _batchSize)
                     {
                         await _store.WriteBatchAsync(batch, drainCt);
+                        _metrics.AddWritten(batch.Count);
                         batch.Clear();
                     }
                 }
@@ -193,13 +191,13 @@ public sealed class TickProcessingPipeline : IDisposable
                 _channel.Reader.Count);
         }
 
-        // Последний батч
         if (batch.Count > 0)
         {
             try
             {
                 using var finalCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 await _store.WriteBatchAsync(batch, finalCts.Token);
+                _metrics.AddWritten(batch.Count);
             }
             catch (Exception ex)
             {
