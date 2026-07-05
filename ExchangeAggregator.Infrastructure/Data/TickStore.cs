@@ -50,27 +50,24 @@ public sealed class TickStore : ITickStore
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (attempt < MaxRetries)
             {
-                _logger.LogWarning(ex, "Retry {Attempt}/{Max} записи батча ({Count} тиков)", attempt + 1, MaxRetries, entities.Count);
+                _logger.LogWarning(ex,
+                    "Retry {Attempt}/{Max} записи батча ({Count} тиков)",
+                    attempt + 1, MaxRetries, entities.Count);
                 _metrics.IncrementWriteErrors();
                 await Task.Delay(TimeSpan.FromMilliseconds(Math.Pow(2, attempt) * 100), ct);
             }
+            catch (Exception ex)
+            {
+                // Последняя попытка провалилась — дропаем с логом
+                _logger.LogError(ex,
+                    "Не удалось записать батч ({Count} тиков) после {Max} ретраев",
+                    entities.Count, MaxRetries);
+                _metrics.IncrementWriteErrors();
+                _metrics.AddDropped(entities.Count);
+                return entities.Count;
+            }
         }
 
-        // Финальная попытка
-        try
-        {
-            await using var db = await _dbFactory.CreateDbContextAsync(ct);
-            await db.Ticks.AddRangeAsync(entities, ct);
-            await db.SaveChangesAsync(ct);
-            _metrics.AddWritten(entities.Count);
-            return 0;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(ex, "Не удалось записать батч ({Count} тиков) после {Max} ретраев", entities.Count, MaxRetries);
-            _metrics.IncrementWriteErrors();
-            _metrics.AddDropped(entities.Count);
-            return entities.Count;
-        }
+        return entities.Count; // недостижимо, но компилятор требует
     }
 }

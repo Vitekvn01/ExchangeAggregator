@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ExchangeAggregator.Infrastructure.Data;
 
-public sealed class TickDbContext(DbContextOptions<TickDbContext> options) : DbContext(options)
+public class TickDbContext(DbContextOptions<TickDbContext> options) : DbContext(options)
 {
     public DbSet<TickEntity> Ticks => Set<TickEntity>();
 
