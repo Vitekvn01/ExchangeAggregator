@@ -44,7 +44,7 @@ public sealed class TickStore : ITickStore
                 await using var db = await _dbFactory.CreateDbContextAsync(ct);
                 await db.Ticks.AddRangeAsync(entities, ct);
                 await db.SaveChangesAsync(ct);
-                _metrics.AddWritten(entities.Count);
+                // ✅ AddWritten вызывается вызывающей стороной (pipeline)
                 return 0;
             }
             catch (OperationCanceledException) { throw; }
@@ -58,7 +58,7 @@ public sealed class TickStore : ITickStore
             }
             catch (Exception ex)
             {
-                // Последняя попытка провалилась — дропаем с логом
+                // Последняя попытка провалилась — дропаем
                 _logger.LogError(ex,
                     "Не удалось записать батч ({Count} тиков) после {Max} ретраев",
                     entities.Count, MaxRetries);
@@ -68,6 +68,6 @@ public sealed class TickStore : ITickStore
             }
         }
 
-        return entities.Count; // недостижимо, но компилятор требует
+        return entities.Count; // недостижимо
     }
 }

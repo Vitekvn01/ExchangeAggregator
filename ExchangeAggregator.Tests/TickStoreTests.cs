@@ -19,7 +19,8 @@ public class TickStoreTests
         int dropped = await store.WriteBatchAsync(ticks, CancellationToken.None);
 
         Assert.Equal(0, dropped);
-        Assert.Equal(1, metrics.Written);
+        // Written — зона ответственности pipeline, TickStore только пишет в БД
+        Assert.Equal(0, metrics.Written);
         Assert.Equal(0, metrics.Dropped);
         Assert.Equal(0, metrics.WriteErrors);
     }

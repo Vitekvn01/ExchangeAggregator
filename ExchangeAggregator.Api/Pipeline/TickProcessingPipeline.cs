@@ -67,7 +67,8 @@ public sealed class TickProcessingPipeline : IDisposable
         }
         finally
         {
-            await DrainAndFlushAsync(externalCt);
+            // externalCt не передаём — после base.StopAsync он уже cancelled
+            await DrainAndFlushAsync();
         }
     }
 
@@ -104,7 +105,6 @@ public sealed class TickProcessingPipeline : IDisposable
         }
         finally
         {
-            // Не теряем батч при отмене или закрытии канала
             if (batch.Count > 0)
             {
                 try
@@ -160,17 +160,19 @@ public sealed class TickProcessingPipeline : IDisposable
         _metrics.AddWritten(toWrite.Length);
     }
 
-    private async Task DrainAndFlushAsync(CancellationToken ct)
+    /// <summary>
+    /// Вычитывает оставшиеся тики из канала с ограничением по таймауту.
+    /// Не принимает внешний CancellationToken — после base.StopAsync он уже cancelled.
+    /// </summary>
+    private async Task DrainAndFlushAsync()
     {
         var batch = new List<NormalizedTick>(_batchSize);
 
         try
         {
             using var timeoutCts = new CancellationTokenSource(_drainTimeout);
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-            var drainCt = linked.Token;
 
-            while (await _channel.Reader.WaitToReadAsync(drainCt))
+            while (await _channel.Reader.WaitToReadAsync(timeoutCts.Token))
             {
                 while (_channel.Reader.TryRead(out var json))
                 {
@@ -178,7 +180,7 @@ public sealed class TickProcessingPipeline : IDisposable
 
                     if (batch.Count >= _batchSize)
                     {
-                        await _store.WriteBatchAsync(batch, drainCt);
+                        await _store.WriteBatchAsync(batch, timeoutCts.Token);
                         _metrics.AddWritten(batch.Count);
                         batch.Clear();
                     }
